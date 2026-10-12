@@ -48,12 +48,11 @@ jobs:
             --query SecretString --output text | jq -r .SNOWFLAKE_PRIVATE_KEY > ~/.snowflake/rsa_key.p8
           chmod 600 ~/.snowflake/rsa_key.p8
 
-      # Prints only the first and last line (cut short) and the line count, never the key itself
+      # Shows the layout of the key file with the key characters hidden: <chunk> stands for 8+ key characters
       - name: Check key format
         run: |
-          echo "first line: $(head -n1 ~/.snowflake/rsa_key.p8 | cut -c1-40)"
-          echo "last line:  $(tail -n1 ~/.snowflake/rsa_key.p8 | cut -c1-40)"
           echo "line count: $(wc -l < ~/.snowflake/rsa_key.p8)"
+          sed -E 's#[A-Za-z0-9+/=]{8,}#<chunk>#g' ~/.snowflake/rsa_key.p8 | uniq -c
 
       - uses: hashicorp/setup-terraform@v3
         with:
