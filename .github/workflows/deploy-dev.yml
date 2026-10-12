@@ -39,13 +39,13 @@ jobs:
           aws-region: ${{ vars.AWS_REGION }}
 
       # The Snowflake provider reads its key from ~/.snowflake/rsa_key.p8
-      # The secret is JSON with the key in a field; jq extracts it and restores the line breaks
+      # The secret holds the key as one line of base64 (survives any input box); base64 -d restores the key
       - name: Fetch Snowflake private key from Secrets Manager
         run: |
           mkdir -p ~/.snowflake
           aws secretsmanager get-secret-value \
             --secret-id SNOWFLAKE_PRIVATE_KEY \
-            --query SecretString --output text | jq -r .SNOWFLAKE_PRIVATE_KEY > ~/.snowflake/rsa_key.p8
+            --query SecretString --output text | base64 -d > ~/.snowflake/rsa_key.p8
           chmod 600 ~/.snowflake/rsa_key.p8
 
       # Shows the layout of the key file with the key characters hidden: <chunk> stands for 8+ key characters
@@ -53,6 +53,7 @@ jobs:
         run: |
           echo "line count: $(wc -l < ~/.snowflake/rsa_key.p8)"
           sed -E 's#[A-Za-z0-9+/=]{8,}#<chunk>#g' ~/.snowflake/rsa_key.p8 | uniq -c
+          openssl pkey -in ~/.snowflake/rsa_key.p8 -noout && echo "key parses OK"
 
       - uses: hashicorp/setup-terraform@v3
         with:
