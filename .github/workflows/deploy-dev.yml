@@ -30,13 +30,17 @@ jobs:
       TF_VAR_snowflake_iam_user_arn: ${{ vars.SNOWFLAKE_IAM_USER_ARN }}
       TF_VAR_snowflake_external_id: ${{ vars.SNOWFLAKE_EXTERNAL_ID }}
       TF_VAR_snowpipe_queue_arn: ${{ vars.SNOWPIPE_QUEUE_ARN }}
+    
     steps:
       - uses: actions/checkout@v4
 
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
-          aws-region: ${{ vars.AWS_REGION }}
+          aws-region: ap-southeast-2
+          disable-retry: true # fail on the first error so the real message shows
+      - name: Show who AWS thinks we are
+        run: aws sts get-caller-identity
 
       # The Snowflake provider reads its key from ~/.snowflake/rsa_key.p8
       - name: Fetch Snowflake private key from Secrets Manager
