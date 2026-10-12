@@ -6,23 +6,26 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 5.0"
     }
+    snowflake = {
+      source  = "snowflakedb/snowflake"
+      version = "~> 2.0"
+    }
   }
 }
 
+# Real AWS, using the terraform-admin profile from ~/.aws/credentials.
 provider "aws" {
-  region                      = var.region
-  access_key                  = "test"
-  secret_key                  = "test"
-  skip_credentials_validation = true
-  skip_metadata_api_check     = true
-  skip_requesting_account_id  = true
-  s3_use_path_style           = true
+  region  = var.region
+  profile = "terraform-admin"
+}
 
-  # Add more services here as you use them (dynamodb, sqs, lambda, ...)
-  endpoints {
-    s3  = var.floci_endpoint
-    sts = var.floci_endpoint
-    iam = var.floci_endpoint
-    ec2 = var.floci_endpoint
-  }
+provider "snowflake" {
+  organization_name = var.snowflake_organization_name
+  account_name      = var.snowflake_account_name
+  user              = var.snowflake_user
+  role              = var.snowflake_role
+
+  # Key-pair auth: no password, no MFA prompt. The key file lives outside the repo.
+  authenticator = "SNOWFLAKE_JWT"
+  private_key   = file(pathexpand(var.snowflake_private_key_path))
 }

@@ -28,3 +28,32 @@ resource "aws_iam_role" "github_deploy" {
     ]
   })
 }
+
+# What the workflow may do: read the Terraform state bucket, nothing else.
+resource "aws_iam_role_policy" "github_deploy" {
+  name = "kb-pipeline-read-state"
+  role = aws_iam_role.github_deploy.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = ["s3:ListBucket"]
+        Resource = "arn:aws:s3:::${var.state_bucket}"
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["s3:GetObject"]
+        Resource = "arn:aws:s3:::${var.state_bucket}/*"
+      },
+      {
+        # The state bucket is encrypted with KMS, so reading needs decrypt
+        Effect    = "Allow"
+        Action    = ["kms:Decrypt"]
+        Resource  = "*"
+        Condition = { StringEquals = { "kms:ViaService" = "s3.${var.region}.amazonaws.com" } }
+      }
+    ]
+  })
+}

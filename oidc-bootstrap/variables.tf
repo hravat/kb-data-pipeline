@@ -1,17 +1,17 @@
 variable "region" {
-  description = "AWS region to use against Floci"
+  description = "AWS region"
   type        = string
-  default     = "us-east-1"
-}
-
-variable "floci_endpoint" {
-  description = "Floci endpoint URL (use http://floci:4566 from inside the Compose network)"
-  type        = string
-  default     = "http://localhost:4566"
+  default     = "ap-southeast-2"
 }
 
 variable "github_repo" {
   description = "GitHub repository allowed to assume the deploy role (owner/name)"
   type        = string
   default     = "hravat/kb-data-pipeline"
+}
+
+variable "state_bucket" {
+  description = "Terraform state bucket the role may read"
+  type        = string
+  default     = "kb-data-pipeline-tfstate-hravat"
 }
