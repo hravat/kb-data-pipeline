@@ -2,7 +2,8 @@
 module "aws" {
   source = "./aws"
 
-  landing_bucket = var.landing_bucket
+  landing_bucket             = var.landing_bucket
+  snowflake_access_role_name = var.snowflake_access_role_name
 
   # Empty until the Snowflake objects exist (see snowflake-sql/setup.sql)
   snowflake_iam_user_arn = var.snowflake_iam_user_arn
@@ -13,4 +14,7 @@ module "aws" {
 # Snowflake: database and schema; the rest is in snowflake-sql/setup.sql
 module "snowflake" {
   source = "./snowflake"
+
+  database_name = var.database_name
+  schema_name   = "RAW" # same in every environment
 }

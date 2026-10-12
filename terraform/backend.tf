@@ -1,12 +1,12 @@
 # State lives in the bucket created by ../backend-bootstrap (apply that first).
-# Backend blocks can't use variables, so the values are written out.
+# The key is per environment and is passed at init, because backend blocks can't use variables:
+#   terraform init -backend-config="key=terraform/dev/terraform.tfstate"
+# Credentials: locally the AWS_PROFILE environment variable; in CI the OIDC credentials.
 terraform {
   backend "s3" {
     bucket       = "kb-data-pipeline-tfstate-hravat"
-    key          = "terraform/terraform.tfstate"
     region       = "ap-southeast-2"
     use_lockfile = true
     encrypt      = true
-    profile      = "terraform-admin"
   }
 }

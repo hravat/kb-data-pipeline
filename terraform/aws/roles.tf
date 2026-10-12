@@ -3,7 +3,7 @@ data "aws_caller_identity" "current" {}
 
 # Role Snowflake assumes to read the bucket; trust is filled in after DESC INTEGRATION
 resource "aws_iam_role" "snowflake_access" {
-  name = "kb-pipeline-snowflake-access"
+  name = var.snowflake_access_role_name
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -15,8 +15,8 @@ resource "aws_iam_role" "snowflake_access" {
           AWS = var.snowflake_iam_user_arn != "" ? var.snowflake_iam_user_arn : "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"
         }
         Action = "sts:AssumeRole"
-        # External ID from the integration stops anyone else using this role
-        Condition = { StringEquals = { "sts:ExternalId" = var.snowflake_external_id } }
+        # External ID from the integration stops anyone else using this role ("pending" until it exists)
+        Condition = { StringEquals = { "sts:ExternalId" = coalesce(var.snowflake_external_id, "pending") } }
       }
     ]
   })

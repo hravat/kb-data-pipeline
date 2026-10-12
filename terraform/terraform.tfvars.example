@@ -1,0 +1,15 @@
+# Copy to terraform.tfvars (gitignored) and fill in for a local run. CI passes these from GitHub instead.
+region                      = "ap-southeast-2"
+landing_bucket              = "kb-data-pipeline-landing-hravat-dev"
+snowflake_access_role_name  = "kb-pipeline-snowflake-access-dev"
+database_name               = "DEV_KB_DATA_PIPELINE"
+snowflake_organization_name = "OLEMHOV"
+snowflake_account_name      = "NY88954"
+snowflake_user              = "HUSSAIN.RAVAT.NZ@GMAIL.COM"
+snowflake_role              = "ACCOUNTADMIN"
+snowflake_private_key_path  = "~/.snowflake/rsa_key.p8"
+
+# Fill in after the first run (leave empty before then)
+snowflake_iam_user_arn = ""
+snowflake_external_id  = ""
+snowpipe_queue_arn     = ""

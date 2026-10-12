@@ -13,10 +13,9 @@ terraform {
   }
 }
 
-# Real AWS, using the terraform-admin profile from ~/.aws/credentials.
+# Real AWS. Credentials come from the environment: AWS_PROFILE locally (terraform-admin), OIDC in CI.
 provider "aws" {
-  region  = var.region
-  profile = "terraform-admin"
+  region = var.region
 }
 
 provider "snowflake" {
