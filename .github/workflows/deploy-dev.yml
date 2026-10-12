@@ -43,10 +43,9 @@ jobs:
         run: |
           mkdir -p ~/.snowflake
           aws secretsmanager get-secret-value \
-            --secret-id kb-pipeline/dev/snowflake-private-key \
+            --secret-id SNOWFLAKE_PRIVATE_KEY \
             --query SecretString --output text > ~/.snowflake/rsa_key.p8
           chmod 600 ~/.snowflake/rsa_key.p8
-
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.14.7
