@@ -93,6 +93,7 @@ jobs:
             terraform/plan.txt
           retention-days: 7
           if-no-files-found: error
+          overwrite: true # lets "Re-run all jobs" replace the stored plan from the earlier attempt
 
   apply:
     if: github.event.pull_request.head.ref == 'dev'
