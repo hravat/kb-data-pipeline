@@ -4,10 +4,10 @@ variable "region" {
   default     = "ap-southeast-2"
 }
 
-variable "github_repo" {
-  description = "GitHub repository allowed to assume the deploy role (owner/name)"
+variable "github_sub" {
+  description = "Token subject pattern allowed to assume the role: any branch of this repo. It includes numeric owner and repo IDs."
   type        = string
-  default     = "hravat/kb-data-pipeline"
+  default     = "repo:hravat@32519928/kb-data-pipeline@1414955736:ref:refs/heads/*"
 }
 
 variable "state_bucket" {

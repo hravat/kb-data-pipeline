@@ -21,7 +21,10 @@ resource "aws_iam_role" "github_deploy" {
         Condition = {
           StringEquals = {
             "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
-            "token.actions.githubusercontent.com:sub" = "repo:${var.github_repo}:ref:refs/heads/main"
+          }
+          # StringLike so the * wildcard matches any branch
+          StringLike = {
+            "token.actions.githubusercontent.com:sub" = var.github_sub
           }
         }
       }
