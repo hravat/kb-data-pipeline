@@ -65,10 +65,10 @@ resource "aws_iam_role_policy" "github_deploy" {
         Condition = { StringEquals = { "kms:ViaService" = "s3.${var.region}.amazonaws.com" } }
       },
       {
-        # Read the Snowflake private key, nothing else in Secrets Manager
+        # Read the Snowflake private key secret, nothing else in Secrets Manager (names end in a random -suffix)
         Effect   = "Allow"
         Action   = ["secretsmanager:GetSecretValue"]
-        Resource = "arn:aws:secretsmanager:${var.region}:*:secret:${var.secret_prefix}*"
+        Resource = [for name in var.secret_names : "arn:aws:secretsmanager:${var.region}:*:secret:${name}-*"]
       }
     ]
   })

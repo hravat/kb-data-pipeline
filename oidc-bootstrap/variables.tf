@@ -19,8 +19,8 @@ variable "state_bucket" {
   default     = "kb-data-pipeline-tfstate-hravat"
 }
 
-variable "secret_prefix" {
-  description = "Prefix of the Secrets Manager secrets the role may read (the Snowflake private keys)"
-  type        = string
-  default     = "kb-pipeline/"
+variable "secret_names" {
+  description = "Names of the Secrets Manager secrets the role may read (the Snowflake private key)"
+  type        = list(string)
+  default     = ["SNOWFLAKE_PRIVATE_KEY"]
 }
