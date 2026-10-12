@@ -11,6 +11,8 @@ jobs:
   plan:
     runs-on: ubuntu-latest
     environment: dev
+    outputs:
+      state_key: ${{ vars.TF_STATE_KEY }} # passed on to the apply job
     timeout-minutes: 15
     defaults:
       run:
@@ -66,11 +68,68 @@ jobs:
           terraform_version: 1.14.7
 
       - name: Terraform init
-        run: terraform init -input=false -backend-config="key=${{ vars.TF_STATE_KEY }}"
+        run: terraform init -backend-config="key=${{ vars.TF_STATE_KEY }}"
 
       - name: Terraform validate
         run: terraform validate
 
-      # Plan only. Applying needs broader permissions than the deploy role has today.
+      # Save the plan to a file (and a readable copy), then store both so the apply job uses exactly this plan
       - name: Terraform plan
-        run: terraform plan -input=false
+        run: |
+          terraform plan -out=tfplan
+          terraform show -no-color tfplan > plan.txt
+
+      - name: Store the plan
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan-dev
+          path: |
+            terraform/tfplan
+            terraform/plan.txt
+          retention-days: 7
+          if-no-files-found: error
+
+  apply:
+    needs: plan # wait for the plan job
+    runs-on: ubuntu-latest
+    environment: dev
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: terraform
+    # No TF_VAR_* here: a saved plan carries the variable values it was made with
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      # The Snowflake provider reads its key from ~/.snowflake/rsa_key.p8
+      # The secret is JSON {"SNOWFLAKE_PRIVATE_KEY": "<key on one line, chunks separated by spaces>"}.
+      # Rebuild the PEM: take the body, put each chunk on its own line, add the BEGIN and END lines back.
+      - name: Fetch Snowflake private key from Secrets Manager
+        run: |
+          mkdir -p ~/.snowflake
+          KEY=$(aws secretsmanager get-secret-value \
+            --secret-id SNOWFLAKE_PRIVATE_KEY \
+            --query SecretString --output text | jq -r .SNOWFLAKE_PRIVATE_KEY)
+          {
+            echo "-----BEGIN PRIVATE KEY-----"
+            echo "$KEY" | sed -e 's/-----BEGIN PRIVATE KEY-----//' -e 's/-----END PRIVATE KEY-----//' | tr -s ' ' '\n' | sed '/^$/d'
+            echo "-----END PRIVATE KEY-----"
+          } > ~/.snowflake/rsa_key.p8
+          chmod 600 ~/.snowflake/rsa_key.p8
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.14.7
+
+      # Same init as the plan job, so the saved plan matches this backend and these providers
+      - name: Terraform init
+        run: terraform init -backend-config="key=${{ needs.plan.outputs.state_key }}"
+
+      # Applies exactly the stored plan, without asking for confirmation
+      - name: Terraform apply (the stored plan)
+        run: terraform apply -auto-approve
