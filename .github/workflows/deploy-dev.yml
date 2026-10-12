@@ -142,12 +142,6 @@ jobs:
       - name: Terraform init
         run: terraform init -backend-config="key=${{ vars.TF_STATE_KEY }}"
 
-      - name: Download the stored plan
-        uses: actions/download-artifact@v4
-        with:
-          name: tfplan-dev
-          path: terraform
-
       # Applies exactly the stored plan, without asking for confirmation
       - name: Terraform apply (the stored plan)
-        run: terraform apply -auto-approve tfplan
+        run: terraform apply -auto-approve

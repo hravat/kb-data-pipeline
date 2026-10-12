@@ -65,10 +65,38 @@ resource "aws_iam_role_policy" "github_deploy" {
         Condition = { StringEquals = { "kms:ViaService" = "s3.${var.region}.amazonaws.com" } }
       },
       {
-        # Read the Snowflake private key, nothing else in Secrets Manager
+        # Create and manage the landing buckets (and their files), only buckets with the project prefix
+        Effect = "Allow"
+        Action = ["s3:*"]
+        Resource = [
+          "arn:aws:s3:::${var.landing_bucket_prefix}*",
+          "arn:aws:s3:::${var.landing_bucket_prefix}*/*",
+        ]
+      },
+      {
+        # Create and manage KMS keys. CreateKey cannot be limited to a resource, so these apply to all keys.
+        Effect = "Allow"
+        Action = [
+          "kms:CreateKey", "kms:CreateAlias", "kms:DeleteAlias", "kms:UpdateAlias",
+          "kms:EnableKeyRotation", "kms:DisableKeyRotation", "kms:PutKeyPolicy",
+          "kms:TagResource", "kms:UntagResource", "kms:ScheduleKeyDeletion", "kms:CancelKeyDeletion",
+        ]
+        Resource = "*"
+      },
+      {
+        # Create and manage the roles Snowflake assumes, only roles with the project prefix
+        Effect = "Allow"
+        Action = [
+          "iam:CreateRole", "iam:DeleteRole", "iam:UpdateRole", "iam:UpdateAssumeRolePolicy",
+          "iam:PutRolePolicy", "iam:DeleteRolePolicy", "iam:TagRole", "iam:UntagRole",
+        ]
+        Resource = "arn:aws:iam::*:role/${var.snowflake_role_prefix}*"
+      },
+      {
+        # Read the Snowflake private key secret, nothing else in Secrets Manager (names end in a random -suffix)
         Effect   = "Allow"
         Action   = ["secretsmanager:GetSecretValue"]
-        Resource = "arn:aws:secretsmanager:${var.region}:*:secret:${var.secret_prefix}*"
+        Resource = [for name in var.secret_names : "arn:aws:secretsmanager:${var.region}:*:secret:${name}-*"]
       }
     ]
   })
