@@ -11,8 +11,6 @@ jobs:
   plan:
     runs-on: ubuntu-latest
     environment: dev
-    outputs:
-      state_key: ${{ vars.TF_STATE_KEY }} # passed on to the apply job
     timeout-minutes: 15
     defaults:
       run:
@@ -90,14 +88,28 @@ jobs:
           if-no-files-found: error
 
   apply:
-    needs: plan # wait for the plan job
+    needs: plan # runs only after the plan job succeeds
     runs-on: ubuntu-latest
     environment: dev
     timeout-minutes: 15
     defaults:
       run:
         working-directory: terraform
-    # No TF_VAR_* here: a saved plan carries the variable values it was made with
+    # GitHub variables become Terraform variables (TF_VAR_<name>)
+    env:
+      TF_VAR_region: ${{ vars.AWS_REGION }}
+      TF_VAR_landing_bucket: ${{ vars.LANDING_BUCKET }}
+      TF_VAR_database_name: ${{ vars.DATABASE_NAME }}
+      TF_VAR_snowflake_access_role_name: ${{ vars.SNOWFLAKE_ACCESS_ROLE_NAME }}
+      TF_VAR_snowflake_organization_name: ${{ vars.SNOWFLAKE_ORGANIZATION_NAME }}
+      TF_VAR_snowflake_account_name: ${{ vars.SNOWFLAKE_ACCOUNT_NAME }}
+      TF_VAR_snowflake_user: ${{ vars.SNOWFLAKE_USER }}
+      TF_VAR_snowflake_role: ${{ vars.SNOWFLAKE_ROLE }}
+      TF_VAR_snowflake_private_key_path: ~/.snowflake/rsa_key.p8 # where the fetch step below writes the key
+      # Empty until the first run has produced them; Terraform treats empty as "not yet"
+      TF_VAR_snowflake_iam_user_arn: ${{ vars.SNOWFLAKE_IAM_USER_ARN }}
+      TF_VAR_snowflake_external_id: ${{ vars.SNOWFLAKE_EXTERNAL_ID }}
+      TF_VAR_snowpipe_queue_arn: ${{ vars.SNOWPIPE_QUEUE_ARN }}
     steps:
       - uses: actions/checkout@v4
 
@@ -126,10 +138,16 @@ jobs:
         with:
           terraform_version: 1.14.7
 
-      # Same init as the plan job, so the saved plan matches this backend and these providers
+      # Same init as the plan job, so the stored plan matches this backend and these providers
       - name: Terraform init
-        run: terraform init -backend-config="key=${{ needs.plan.outputs.state_key }}"
+        run: terraform init -backend-config="key=${{ vars.TF_STATE_KEY }}"
+
+      - name: Download the stored plan
+        uses: actions/download-artifact@v4
+        with:
+          name: tfplan-dev
+          path: terraform
 
       # Applies exactly the stored plan, without asking for confirmation
       - name: Terraform apply (the stored plan)
-        run: terraform apply -auto-approve
+        run: terraform apply -auto-approve tfplan
