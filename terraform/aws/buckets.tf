@@ -26,6 +26,13 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "landing" {
   }
 }
 
+# Empty object that makes transactions/ show up as a folder in the console
+resource "aws_s3_object" "transactions_folder" {
+  bucket  = aws_s3_bucket.landing.id
+  key     = "transactions/"
+  content = ""
+}
+
 # T07: notify Snowpipe's queue when a file lands; only created once the pipe's queue ARN is known
 resource "aws_s3_bucket_notification" "landing" {
   count  = var.snowpipe_queue_arn != "" ? 1 : 0

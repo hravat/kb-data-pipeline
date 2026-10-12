@@ -46,17 +46,17 @@ variable "snowflake_private_key_path" {
 variable "snowflake_iam_user_arn" {
   description = "STORAGE_AWS_IAM_USER_ARN from DESC INTEGRATION. Empty until the integration exists."
   type        = string
-  default     = ""
+  default     = "arn:aws:iam::081711905506:user/6nsc2000-s"
 }
 
 variable "snowflake_external_id" {
   description = "STORAGE_AWS_EXTERNAL_ID from DESC INTEGRATION. Placeholder until the integration exists."
   type        = string
-  default     = "pending"
+  default     = "VY19864_SFCRole=3_QWBQEE7WCEf0zv1vRGGpoFOefdw="
 }
 
 variable "snowpipe_queue_arn" {
   description = "notification_channel from SHOW PIPES (the Snowpipe SQS queue ARN). Empty until the pipe exists."
   type        = string
-  default     = ""
+  default     = "arn:aws:sqs:ap-southeast-2:081711905506:sf-snowpipe-AIDARGBTIXLRLXWGYDQQM-mhC1NvqXguaGiccC4UlYUw"
 }
