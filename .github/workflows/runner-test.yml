@@ -1,0 +1,21 @@
+name: runner-test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  check-floci:
+    runs-on: self-hosted
+    steps:
+      - name: Where am I running
+        run: |
+          hostname
+          docker --version
+
+      - name: Containers on this machine
+        run: docker ps --format "{{.Names}}  {{.Status}}"
+
+      - name: Reach floci on localhost
+        run: |
+          $code = curl.exe -s -o NUL -w "%{http_code}" http://localhost:4566
+          "floci answered with HTTP $code"

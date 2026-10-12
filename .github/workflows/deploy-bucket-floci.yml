@@ -1,0 +1,29 @@
+name: deploy-bucket-floci
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    defaults:
+      run:
+        working-directory: backend-bootstrap
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          clean: false # keep the local terraform.tfstate on the runner between runs
+
+      - name: Terraform init
+        run: terraform init -input=false
+
+      - name: Terraform validate
+        run: terraform validate
+
+      - name: Terraform apply (against floci)
+        run: terraform apply -auto-approve -input=false
+
+      - name: Show what was created
+        run: |
+          terraform state list
+          terraform output state_bucket
