@@ -22,9 +22,9 @@ resource "aws_iam_role" "github_deploy" {
           StringEquals = {
             "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
           }
-          # StringLike so the * wildcard matches any branch
+          # StringLike so the * wildcard matches any branch or environment; either form may assume the role
           StringLike = {
-            "token.actions.githubusercontent.com:sub" = var.github_sub
+            "token.actions.githubusercontent.com:sub" = var.github_subs
           }
         }
       }
@@ -32,9 +32,15 @@ resource "aws_iam_role" "github_deploy" {
   })
 }
 
-# What the workflow may do: read the Terraform state bucket, nothing else.
+# Read-only view of the account, enough for terraform plan
+resource "aws_iam_role_policy_attachment" "read_only" {
+  role       = aws_iam_role.github_deploy.name
+  policy_arn = "arn:aws:iam::aws:policy/ReadOnlyAccess"
+}
+
+# Plus: use the Terraform state (read, write, lock) and read the Snowflake key secret.
 resource "aws_iam_role_policy" "github_deploy" {
-  name = "kb-pipeline-read-state"
+  name = "kb-pipeline-state-and-secrets"
   role = aws_iam_role.github_deploy.id
 
   policy = jsonencode({
@@ -46,16 +52,23 @@ resource "aws_iam_role_policy" "github_deploy" {
         Resource = "arn:aws:s3:::${var.state_bucket}"
       },
       {
+        # Write and delete are needed for the state file and its lock file
         Effect   = "Allow"
-        Action   = ["s3:GetObject"]
+        Action   = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"]
         Resource = "arn:aws:s3:::${var.state_bucket}/*"
       },
       {
-        # The state bucket is encrypted with KMS, so reading needs decrypt
+        # The state bucket is encrypted with KMS
         Effect    = "Allow"
-        Action    = ["kms:Decrypt"]
+        Action    = ["kms:Decrypt", "kms:GenerateDataKey"]
         Resource  = "*"
         Condition = { StringEquals = { "kms:ViaService" = "s3.${var.region}.amazonaws.com" } }
+      },
+      {
+        # Read the Snowflake private key, nothing else in Secrets Manager
+        Effect   = "Allow"
+        Action   = ["secretsmanager:GetSecretValue"]
+        Resource = "arn:aws:secretsmanager:${var.region}:*:secret:${var.secret_prefix}*"
       }
     ]
   })
