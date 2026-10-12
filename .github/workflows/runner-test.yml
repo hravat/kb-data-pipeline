@@ -6,6 +6,9 @@ on:
 jobs:
   check-floci:
     runs-on: self-hosted
+    defaults:
+      run:
+        shell: cmd # PowerShell scripts are blocked by the execution policy on this machine
     steps:
       - name: Where am I running
         run: |
@@ -16,6 +19,4 @@ jobs:
         run: docker ps --format "{{.Names}}  {{.Status}}"
 
       - name: Reach floci on localhost
-        run: |
-          $code = curl.exe -s -o NUL -w "%{http_code}" http://localhost:4566
-          "floci answered with HTTP $code"
+        run: curl.exe -s -I -m 5 http://localhost:4566
