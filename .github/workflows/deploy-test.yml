@@ -1,0 +1,157 @@
+name: deploy-test
+
+# Runs when a pull request from dev into test is opened or updated.
+# It deploys the code from the dev branch to the test environment.
+
+on:
+  pull_request:
+    branches: [test]
+
+permissions:
+  id-token: write # lets the job request the GitHub OIDC token
+  contents: read
+
+jobs:
+  plan:
+    if: github.event.pull_request.head.ref == 'dev'
+    runs-on: ubuntu-latest
+    environment: test
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: terraform
+    # GitHub variables become Terraform variables (TF_VAR_<name>)
+    env:
+      TF_VAR_region: ${{ vars.AWS_REGION }}
+      TF_VAR_landing_bucket: ${{ vars.LANDING_BUCKET }}
+      TF_VAR_database_name: ${{ vars.DATABASE_NAME }}
+      TF_VAR_snowflake_access_role_name: ${{ vars.SNOWFLAKE_ACCESS_ROLE_NAME }}
+      TF_VAR_snowflake_organization_name: ${{ vars.SNOWFLAKE_ORGANIZATION_NAME }}
+      TF_VAR_snowflake_account_name: ${{ vars.SNOWFLAKE_ACCOUNT_NAME }}
+      TF_VAR_snowflake_user: ${{ vars.SNOWFLAKE_USER }}
+      TF_VAR_snowflake_role: ${{ vars.SNOWFLAKE_ROLE }}
+      TF_VAR_snowflake_private_key_path: ~/.snowflake/rsa_key.p8 # where the fetch step below writes the key
+      # Empty until the first run has produced them; Terraform treats empty as "not yet"
+      TF_VAR_snowflake_iam_user_arn: ${{ vars.SNOWFLAKE_IAM_USER_ARN }}
+      TF_VAR_snowflake_external_id: ${{ vars.SNOWFLAKE_EXTERNAL_ID }}
+      TF_VAR_snowpipe_queue_arn: ${{ vars.SNOWPIPE_QUEUE_ARN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }} # the code from dev
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      # The Snowflake provider reads its key from ~/.snowflake/rsa_key.p8
+      # The secret is JSON {"SNOWFLAKE_PRIVATE_KEY": "<key on one line, chunks separated by spaces>"}.
+      # Rebuild the PEM: take the body, put each chunk on its own line, add the BEGIN and END lines back.
+      - name: Fetch Snowflake private key from Secrets Manager
+        run: |
+          mkdir -p ~/.snowflake
+          KEY=$(aws secretsmanager get-secret-value \
+            --secret-id SNOWFLAKE_PRIVATE_KEY \
+            --query SecretString --output text | jq -r .SNOWFLAKE_PRIVATE_KEY)
+          {
+            echo "-----BEGIN PRIVATE KEY-----"
+            echo "$KEY" | sed -e 's/-----BEGIN PRIVATE KEY-----//' -e 's/-----END PRIVATE KEY-----//' | tr -s ' ' '\n' | sed '/^$/d'
+            echo "-----END PRIVATE KEY-----"
+          } > ~/.snowflake/rsa_key.p8
+          chmod 600 ~/.snowflake/rsa_key.p8
+
+      # Shows the layout of the key file with the key characters hidden: <chunk> stands for 8+ key characters
+      - name: Check key format
+        run: |
+          echo "line count: $(wc -l < ~/.snowflake/rsa_key.p8)"
+          sed -E 's#[A-Za-z0-9+/=]{8,}#<chunk>#g' ~/.snowflake/rsa_key.p8 | uniq -c
+          openssl pkey -in ~/.snowflake/rsa_key.p8 -noout && echo "key parses OK"
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.14.7
+
+      - name: Terraform init
+        run: terraform init -backend-config="key=${{ vars.TF_STATE_KEY }}"
+
+      - name: Terraform validate
+        run: terraform validate
+
+      # Save the plan to a file (and a readable copy), then store both so the apply job uses exactly this plan
+      - name: Terraform plan
+        run: |
+          terraform plan -out=tfplan
+          terraform show -no-color tfplan > plan.txt
+
+      - name: Store the plan
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan-test
+          path: |
+            terraform/tfplan
+            terraform/plan.txt
+          retention-days: 7
+          if-no-files-found: error
+
+  apply:
+    if: github.event.pull_request.head.ref == 'dev'
+    needs: plan # runs only after the plan job succeeds
+    runs-on: ubuntu-latest
+    environment: test
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: terraform
+    # GitHub variables become Terraform variables (TF_VAR_<name>)
+    env:
+      TF_VAR_region: ${{ vars.AWS_REGION }}
+      TF_VAR_landing_bucket: ${{ vars.LANDING_BUCKET }}
+      TF_VAR_database_name: ${{ vars.DATABASE_NAME }}
+      TF_VAR_snowflake_access_role_name: ${{ vars.SNOWFLAKE_ACCESS_ROLE_NAME }}
+      TF_VAR_snowflake_organization_name: ${{ vars.SNOWFLAKE_ORGANIZATION_NAME }}
+      TF_VAR_snowflake_account_name: ${{ vars.SNOWFLAKE_ACCOUNT_NAME }}
+      TF_VAR_snowflake_user: ${{ vars.SNOWFLAKE_USER }}
+      TF_VAR_snowflake_role: ${{ vars.SNOWFLAKE_ROLE }}
+      TF_VAR_snowflake_private_key_path: ~/.snowflake/rsa_key.p8 # where the fetch step below writes the key
+      # Empty until the first run has produced them; Terraform treats empty as "not yet"
+      TF_VAR_snowflake_iam_user_arn: ${{ vars.SNOWFLAKE_IAM_USER_ARN }}
+      TF_VAR_snowflake_external_id: ${{ vars.SNOWFLAKE_EXTERNAL_ID }}
+      TF_VAR_snowpipe_queue_arn: ${{ vars.SNOWPIPE_QUEUE_ARN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }} # the code from dev
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      # The Snowflake provider reads its key from ~/.snowflake/rsa_key.p8
+      # The secret is JSON {"SNOWFLAKE_PRIVATE_KEY": "<key on one line, chunks separated by spaces>"}.
+      # Rebuild the PEM: take the body, put each chunk on its own line, add the BEGIN and END lines back.
+      - name: Fetch Snowflake private key from Secrets Manager
+        run: |
+          mkdir -p ~/.snowflake
+          KEY=$(aws secretsmanager get-secret-value \
+            --secret-id SNOWFLAKE_PRIVATE_KEY \
+            --query SecretString --output text | jq -r .SNOWFLAKE_PRIVATE_KEY)
+          {
+            echo "-----BEGIN PRIVATE KEY-----"
+            echo "$KEY" | sed -e 's/-----BEGIN PRIVATE KEY-----//' -e 's/-----END PRIVATE KEY-----//' | tr -s ' ' '\n' | sed '/^$/d'
+            echo "-----END PRIVATE KEY-----"
+          } > ~/.snowflake/rsa_key.p8
+          chmod 600 ~/.snowflake/rsa_key.p8
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.14.7
+
+      # Same init as the plan job, so the stored plan matches this backend and these providers
+      - name: Terraform init
+        run: terraform init -backend-config="key=${{ vars.TF_STATE_KEY }}"
+
+      # Applies exactly the stored plan, without asking for confirmation
+      - name: Terraform apply (the stored plan)
+        run: terraform apply -auto-approve
